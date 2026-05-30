@@ -27,6 +27,14 @@ Even if someone watches your screen, they can't replicate HOW you draw.
 - **Matching:** Custom DTW algorithm + SSIM-inspired pixel comparison
 - **Storage:** JSON .sgpx files (binary format planned) - (a new file type to be defined)
 
+
+## Demo Video
+
+Watch the live demo:
+
+https://github.com/manishkumarkmmani-star/signpay-upi-auth/raw/main/demo.mp4
+
+
 ## Quick Start
 
 ### Install
