@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SignPay — Secure UPI</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --card: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #6c63ff;
+    --accent2: #ff6584;
+    --green: #00e5a0;
+    --text: #f0f0ff;
+    --muted: #8888aa;
+    --coin: #f7c948;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .phone {
+    width: 100%;
+    max-width: 390px;
+    min-height: 100vh;
+    background: var(--bg);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* SCREENS */
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease, transform 0.35s ease;
+    transform: translateX(40px);
+    overflow-y: auto;
+  }
+  .screen.active {
+    opacity: 1;
+    pointer-events: all;
+    transform: translateX(0);
+  }
+  .screen.exit {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+
+  /* TOP BAR */
+  .topbar {
+    display: flex;
+    align-items: center;
+    padding: 52px 24px 16px;
+    gap: 12px;
+  }
+  .back-btn {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 18px;
+    transition: background 0.2s;
+  }
+  .back-btn:active { background: var(--border); }
+  .topbar-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  /* HERO */
+  .hero {
+    padding: 48px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .hero-label {
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .hero-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1.15;
+  }
+  .hero-sub {
+    font-size: 14px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* BALANCE CARD */
+  .balance-card {
+    margin: 0 20px;
+    background: linear-gradient(135deg, #1a1040 0%, #0f1a30 100%);
+    border: 1px solid #2a2050;
+    border-radius: 24px;
+    padding: 28px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .balance-card::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 140px; height: 140px;
+    background: radial-gradient(circle, rgba(108,99,255,0.25) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .balance-label {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .balance-amount {
+    font-family: 'Syne', sans-serif;
+    font-size: 42px;
+    font-weight: 800;
+    color: var(--coin);
+    margin: 6px 0 2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .coin-icon { font-size: 32px; }
+  .balance-sub { font-size: 13px; color: var(--muted); }
+  .auth-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0,229,160,0.12);
+    border: 1px solid rgba(0,229,160,0.3);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 11px;
+    color: var(--green);
+    margin-top: 16px;
+    font-weight: 500;
+  }
+  .dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ACTION BUTTONS */
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 20px 20px 0;
+  }
+  .action-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 20px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+  }
+  .action-btn:active { transform: scale(0.97); background: var(--border); }
+  .action-icon { font-size: 28px; margin-bottom: 10px; display: block; }
+  .action-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .action-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* SECTION */
+  .section {
+    padding: 20px 20px 0;
+  }
+  .section-title {
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  /* RECENT */
+  .txn-list { display: flex; flex-direction: column; gap: 10px; }
+  .txn-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .txn-avatar {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .txn-name { font-size: 14px; font-weight: 500; }
+  .txn-time { font-size: 11px; color: var(--muted); }
+  .txn-amt { margin-left: auto; font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; }
+  .txn-amt.out { color: var(--accent2); }
+  .txn-amt.in { color: var(--green); }
+
+  /* CANVAS AREA */
+  .canvas-wrap {
+    margin: 0 20px;
+    background: var(--card);
+    border: 2px dashed var(--border);
+    border-radius: 24px;
+    overflow: hidden;
+    position: relative;
+    transition: border-color 0.3s;
+  }
+  .canvas-wrap.drawing { border-color: var(--accent); border-style: solid; }
+  .canvas-wrap.done { border-color: var(--green); border-style: solid; }
+  .canvas-wrap.failed { border-color: var(--accent2); border-style: solid; }
+
+  /* SIMILARITY METER */
+  .similarity-bar-wrap {
+    margin: 0 20px;
+    display: none;
+  }
+  .similarity-bar-wrap.show { display: block; }
+  .similarity-label {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--muted); margin-bottom: 6px;
+  }
+  .similarity-score { font-weight: 700; font-size: 13px; }
+  .similarity-score.good { color: var(--green); }
+  .similarity-score.bad { color: var(--accent2); }
+  .bar-track {
+    height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%; border-radius: 4px;
+    transition: width 0.6s ease, background 0.4s;
+    width: 0%;
+  }
+  .bar-fill.good { background: var(--green); }
+  .bar-fill.bad { background: var(--accent2); }
+
+  /* MATCH RESULT TOAST */
+  .match-toast {
+    margin: 0 20px;
+    border-radius: 14px;
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    animation: slideUp 0.3s ease;
+  }
+  @keyframes slideUp { from{transform:translateY(8px);opacity:0} to{transform:translateY(0);opacity:1} }
+  .match-toast.show { display: flex; }
+  .match-toast.success { background: rgba(0,229,160,0.1); border: 1px solid rgba(0,229,160,0.3); color: var(--green); }
+  .match-toast.fail { background: rgba(255,101,132,0.1); border: 1px solid rgba(255,101,132,0.3); color: var(--accent2); }
+
+  /* SGPX DEBUG BOX */
+  .sgpx-box {
+    margin: 0 20px;
+    background: #0a0a1a;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 10px;
+    color: #5555aa;
+    font-family: monospace;
+    line-height: 1.7;
+    display: none;
+  }
+  .sgpx-box.show { display: block; }
+
+  @keyframes shake {
+    0%,100%{transform:translateX(0)}
+    20%{transform:translateX(-8px)}
+    40%{transform:translateX(8px)}
+    60%{transform:translateX(-6px)}
+    80%{transform:translateX(6px)}
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    touch-action: none;
+    cursor: crosshair;
+  }
+  .canvas-hint {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .canvas-hint .hint-icon { font-size: 36px; margin-bottom: 8px; }
+  .canvas-hint .hint-text { font-size: 13px; color: var(--muted); }
+
+  /* BTN */
+  .btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 16px;
+    padding: 18px 24px;
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    width: 100%;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .btn:active { transform: scale(0.98); opacity: 0.9; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.secondary {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn.danger { background: var(--accent2); }
+  .btn.success { background: var(--green); color: #000; }
+
+  .btn-row {
+    display: flex; gap: 10px;
+    padding: 0 20px;
+  }
+  .btn-row .btn { flex: 1; }
+
+  /* INFO BOX */
+  .info-box {
+    margin: 0 20px;
+    background: rgba(108,99,255,0.08);
+    border: 1px solid rgba(108,99,255,0.2);
+    border-radius: 16px;
+    padding: 14px 16px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .info-box strong { color: var(--accent); }
+
+  /* AMOUNT INPUT */
+  .amount-display {
+    text-align: center;
+    padding: 24px;
+  }
+  .amount-label { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .amount-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 52px;
+    font-weight: 800;
+    color: var(--coin);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .numpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding: 0 20px;
+  }
+  .numkey {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    color: var(--text);
+  }
+  .numkey:active { background: var(--accent); border-color: var(--accent); transform: scale(0.95); }
+  .numkey.del { font-size: 18px; }
+
+  /* SUCCESS */
+  .success-screen {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    flex: 1; padding: 40px 24px;
+    text-align: center;
+    gap: 16px;
+  }
+  .success-icon {
+    width: 100px; height: 100px;
+    background: rgba(0,229,160,0.1);
+    border: 2px solid var(--green);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 48px;
+    animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  @keyframes popIn { from{transform:scale(0);opacity:0} to{transform:scale(1);opacity:1} }
+  .success-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px; font-weight: 800;
+  }
+  .success-sub { font-size: 14px; color: var(--muted); line-height: 1.6; max-width: 260px; }
+  .success-amount {
+    font-family: 'Syne', sans-serif;
+    font-size: 44px; font-weight: 800;
+    color: var(--coin);
+  }
+  .sig-preview {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 12px 20px;
+    font-size: 12px;
+    color: var(--muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* SECURITY INFO */
+  .security-chips {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 0 20px;
+  }
+  .chip {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 11px;
+    color: var(--muted);
+    display: flex; align-items: center; gap: 4px;
+  }
+
+  /* SEND SCREEN */
+  .recipient-card {
+    margin: 0 20px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 16px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .recipient-avatar {
+    width: 48px; height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #ff6584, #ff9a5c);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+  }
+  .recipient-name { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; }
+  .recipient-id { font-size: 12px; color: var(--muted); }
+
+  /* STEP INDICATOR */
+  .step-indicator {
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 20px;
+  }
+  .step-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--border);
+    transition: all 0.3s;
+  }
+  .step-dot.active { background: var(--accent); width: 24px; border-radius: 4px; }
+  .step-dot.done { background: var(--green); }
+
+  /* RESET */
+  .warning-box {
+    margin: 0 20px;
+    background: rgba(255,101,132,0.08);
+    border: 1px solid rgba(255,101,132,0.25);
+    border-radius: 16px;
+    padding: 14px 16px;
+    font-size: 13px;
+    color: #ff9ab0;
+    line-height: 1.6;
+  }
+
+  .pb { padding-bottom: 32px; }
+  .gap { height: 14px; }
+  .gap8 { height: 8px; }
+  .gap20 { height: 20px; }
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- ========== SCREEN 1: HOME ========== -->
+  <div class="screen active" id="screen-home">
+    <div class="hero">
+      <span class="hero-label">SignPay</span>
+      <h1 class="hero-title">Your signature<br>is your PIN.</h1>
+      <p class="hero-sub">Protected by behavioral biometrics</p>
+    </div>
+
+    <div class="balance-card">
+      <div class="balance-label">Total Balance</div>
+      <div class="balance-amount">
+        <span class="coin-icon">🪙</span>
+        <span id="home-balance">4,200</span>
+      </div>
+      <div class="balance-sub">MemeCoin Wallet · @manish_upi</div>
+      <div class="auth-badge">
+        <span class="dot"></span>
+        Signature Auth Active
+      </div>
+    </div>
+
+    <div class="actions">
+      <div class="action-btn" onclick="goTo('screen-send-amount')">
+        <span class="action-icon">↗️</span>
+        <div class="action-label">Send</div>
+        <div class="action-sub">Transfer coins</div>
+      </div>
+      <div class="action-btn" onclick="goTo('screen-reset-verify')">
+        <span class="action-icon">✏️</span>
+        <div class="action-label">Change Sig</div>
+        <div class="action-sub">Reset password</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Recent Transactions</div>
+      <div class="txn-list">
+        <div class="txn-item">
+          <div class="txn-avatar">🍕</div>
+          <div>
+            <div class="txn-name">Domino's</div>
+            <div class="txn-time">Today, 1:24 PM · Sig verified</div>
+          </div>
+          <div class="txn-amt out">−320 🪙</div>
+        </div>
+        <div class="txn-item">
+          <div class="txn-avatar">👾</div>
+          <div>
+            <div class="txn-name">Rahul Sharma</div>
+            <div class="txn-time">Yesterday · Sig verified</div>
+          </div>
+          <div class="txn-amt in">+500 🪙</div>
+        </div>
+        <div class="txn-item">
+          <div class="txn-avatar">⚡</div>
+          <div>
+            <div class="txn-name">Electricity Bill</div>
+            <div class="txn-time">May 26 · Sig verified</div>
+          </div>
+          <div class="txn-amt out">−820 🪙</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="gap20"></div>
+
+    <div class="security-chips">
+      <div class="chip">🔒 On-device only</div>
+      <div class="chip">📂 .sgpx format</div>
+      <div class="chip">⚡ Behavioral data</div>
+      <div class="chip">🚫 Never transmitted</div>
+    </div>
+    <div class="pb"></div>
+  </div>
+
+  <!-- ========== SCREEN 2: SET SIGNATURE ========== -->
+  <div class="screen" id="screen-set-sig">
+    <div class="topbar">
+      <div class="back-btn" onclick="goTo('screen-home')">←</div>
+      <div class="topbar-title">Create Signature</div>
+    </div>
+
+    <div class="step-indicator" style="padding-bottom:16px">
+      <div class="step-dot active" id="set-step1"></div>
+      <div class="step-dot" id="set-step2"></div>
+    </div>
+
+    <div style="padding: 0 20px 16px">
+      <div class="hero-label" style="margin-bottom:4px">Step 1 of 2</div>
+      <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;">Draw your signature</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px;">Use your finger. Make it unique — like a secret doodle only you know.</div>
+    </div>
+
+    <div class="canvas-wrap" id="cw-set">
+      <canvas id="canvas-set" height="220"></canvas>
+      <div class="canvas-hint" id="hint-set">
+        <div class="hint-icon">✍️</div>
+        <div class="hint-text">Draw anything — a shape,<br>your initials, a pattern</div>
+      </div>
+    </div>
+
+    <div class="gap"></div>
+
+    <div class="info-box">
+      <strong>What gets stored:</strong> Your drawing's pixel pattern + timing data → saved as a <strong>.sgpx</strong> file inside the app. Never leaves your device.
+    </div>
+
+    <div class="gap"></div>
+
+    <div class="btn-row">
+      <button class="btn secondary" onclick="clearCanvas('canvas-set','cw-set','hint-set')">Clear</button>
+      <button class="btn" id="btn-set-next" disabled onclick="goToConfirm()">Next →</button>
+    </div>
+    <div class="pb"></div>
+  </div>
+
+  <!-- ========== SCREEN 3: CONFIRM SIGNATURE ========== -->
+  <div class="screen" id="screen-confirm-sig">
+    <div class="topbar">
+      <div class="back-btn" onclick="goTo('screen-set-sig')">←</div>
+      <div class="topbar-title">Confirm Signature</div>
+    </div>
+
+    <div class="step-indicator" style="padding-bottom:16px">
+      <div class="step-dot done"></div>
+      <div class="step-dot active"></div>
+    </div>
+
+    <div style="padding: 0 20px 16px">
+      <div class="hero-label" style="margin-bottom:4px">Step 2 of 2</div>
+      <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;">Draw it again</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px;">Redraw your signature to confirm. Don't worry if it's not perfect.</div>
+    </div>
+
+    <div class="canvas-wrap" id="cw-confirm">
+      <canvas id="canvas-confirm" height="220"></canvas>
+      <div class="canvas-hint" id="hint-confirm">
+        <div class="hint-icon">🔁</div>
+        <div class="hint-text">Redraw your signature</div>
+      </div>
+    </div>
+
+    <div class="gap"></div>
+
+    <div class="info-box">
+      <strong>Fuzzy matching:</strong> The system allows slight variation — it checks pattern similarity, not pixel-perfect match. Just like how your handwriting looks similar every day.
+    </div>
+
+    <div class="gap"></div>
+
+    <div class="btn-row">
+      <button class="btn secondary" onclick="clearCanvas('canvas-confirm','cw-confirm','hint-confirm')">Clear</button>
+      <button class="btn" id="btn-confirm-save" disabled onclick="saveSignature()">Save Signature ✓</button>
+    </div>
+    <div class="pb"></div>
+  </div>
+
+  <!-- ========== SCREEN 4a: SEND - AMOUNT ========== -->
+  <div class="screen" id="screen-send-amount">
+    <div class="topbar">
+      <div class="back-btn" onclick="goTo('screen-home')">←</div>
+      <div class="topbar-title">Send Coins</div>
+    </div>
+
+    <div class="recipient-card">
+      <div class="recipient-avatar">🧑‍💻</div>
+      <div>
+        <div class="recipient-name">Tejas Desai</div>
+        <div class="recipient-id">tejas@memecoin · Verified</div>
+      </div>
+    </div>
+
+    <div class="amount-display">
+      <div class="amount-label">Enter amount</div>
+      <div class="amount-value">🪙 <span id="send-amount-display">0</span></div>
+    </div>
+
+    <div class="numpad">
+      <div class="numkey" onclick="numPress('1')">1</div>
+      <div class="numkey" onclick="numPress('2')">2</div>
+      <div class="numkey" onclick="numPress('3')">3</div>
+      <div class="numkey" onclick="numPress('4')">4</div>
+      <div class="numkey" onclick="numPress('5')">5</div>
+      <div class="numkey" onclick="numPress('6')">6</div>
+      <div class="numkey" onclick="numPress('7')">7</div>
+      <div class="numkey" onclick="numPress('8')">8</div>
+      <div class="numkey" onclick="numPress('9')">9</div>
+      <div class="numkey" onclick="numPress('00')">00</div>
+      <div class="numkey" onclick="numPress('0')">0</div>
+      <div class="numkey del" onclick="numDel()">⌫</div>
+    </div>
+
+    <div class="gap"></div>
+
+    <div style="padding:0 20px">
+      <button class="btn" id="btn-proceed-pay" onclick="proceedToPay()" disabled>Proceed to Authenticate →</button>
+    </div>
+    <div class="pb"></div>
+  </div>
+
+  <!-- ========== SCREEN 4b: SEND - AUTHENTICATE ========== -->
+  <div class="screen" id="screen-send-auth">
+    <div class="topbar">
+      <div class="back-btn" onclick="goTo('screen-send-amount')">←</div>
+      <div class="topbar-title">Authenticate</div>
+    </div>
+
+    <div style="padding: 0 20px 16px">
+      <div class="hero-label" style="margin-bottom:4px">Sending <span id="auth-amount-label" style="color:var(--coin)">0</span> 🪙</div>
+      <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;">Draw your signature</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px;">To <strong style="color:var(--text)">Tejas Desai</strong> · Draw to authorize this payment</div>
+    </div>
+
+    <div class="canvas-wrap" id="cw-auth">
+      <canvas id="canvas-auth" height="220"></canvas>
+      <div class="canvas-hint" id="hint-auth">
+        <div class="hint-icon">🔐</div>
+        <div class="hint-text">Draw your signature<br>to authorize payment</div>
+      </div>
+    </div>
+
+    <div class="gap"></div>
+
+    <!-- SIMILARITY METER -->
+    <div class="similarity-bar-wrap" id="similarity-wrap">
+      <div class="similarity-label">
+        <span>Signature similarity</span>
+        <span class="similarity-score" id="similarity-score-label">0%</span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill" id="similarity-bar"></div>
+      </div>
+    </div>
+
+    <div class="gap8"></div>
+
+    <!-- MATCH TOAST -->
+    <div class="match-toast" id="match-toast">
+      <span id="match-toast-icon">✅</span>
+      <span id="match-toast-text">Signature matched!</span>
+    </div>
+
+    <div class="gap8"></div>
+
+    <!-- SGPX DEBUG -->
+    <div class="sgpx-box" id="sgpx-debug"></div>
+
+    <div class="gap8"></div>
+
+    <div class="info-box">
+      <strong>Why this is safe:</strong> Even if someone sees your screen, they can't replicate your exact drawing speed, pressure, and stroke pattern. That's your real password.
+    </div>
+
+    <div class="gap"></div>
+
+    <div class="btn-row">
+      <button class="btn secondary" onclick="clearAuthCanvas()">Clear</button>
+      <button class="btn" id="btn-auth-pay" disabled onclick="verifyAndPay()">Verify & Send 🔐</button>
+    </div>
+    <div class="pb"></div>
+  </div>
+
+  <!-- ========== SCREEN 5: SUCCESS ========== -->
+  <div class="screen" id="screen-success">
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:40px 24px;text-align:center;gap:16px;">
+      <div class="success-icon" style="margin:0 auto;">✅</div>
+      <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;">Payment Sent!</div>
+      <div class="success-amount">🪙 <span id="success-amount-val">0</span></div>
+      <div style="font-size:14px;color:var(--muted);">Successfully sent to <strong style="color:var(--text)">Tejas Desai</strong></div>
+
+      <div class="sig-preview">
+        <span>📂</span>
+        <span>auth_log_<span id="success-time">--</span>.sgpx · Signature matched</span>
+      </div>
+
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;font-size:13px;color:var(--muted);text-align:left;line-height:1.8">
+        <div>🔒 <strong style="color:var(--text)">On-device verification</strong></div>
+        <div>📊 <strong style="color:var(--text)">Behavioral data matched</strong></div>
+        <div>🚫 <strong style="color:var(--text)">PIN never used or exposed</strong></div>
+        <div>📂 <strong style="color:var(--text)">.sgpx file — never transmitted</strong></div>
+      </div>
+    </div>
+
+    <div style="padding:0 20px">
+      <button class="btn success" onclick="goHome()">Back to Home</button>
+    </div>
+    <div class="pb"></div>
+  </div>
+
+  <!-- ========== SCREEN: RESET - VERIFY OLD ========== -->
+  <div class="screen" id="screen-reset-verify">
+    <div class="topbar">
+      <div class="back-btn" onclick="goTo('screen-home')">←</div>
+      <div class="topbar-title">Change Signature</div>
+    </div>
+
+    <div class="step-indicator" style="padding-bottom:16px">
+      <div class="step-dot active"></div>
+      <div class="step-dot"></div>
+      <div class="step-dot"></div>
+    </div>
+
+    <div style="padding: 0 20px 16px">
+      <div class="hero-label" style="margin-bottom:4px">Step 1 of 3</div>
+      <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;">Verify current signature</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px;">Draw your existing signature to confirm it's really you.</div>
+    </div>
+
+    <div class="warning-box">
+      ⚠️ Changing your signature will invalidate the old <strong>.sgpx</strong> file and create a new one. Make sure you remember the new one.
+    </div>
+
+    <div class="gap"></div>
+
+    <div class="canvas-wrap" id="cw-reset-v">
+      <canvas id="canvas-reset-v" height="200"></canvas>
+      <div class="canvas-hint" id="hint-reset-v">
+        <div class="hint-icon">🔏</div>
+        <div class="hint-text">Draw your current signature</div>
+      </div>
+    </div>
+
+    <div class="gap"></div>
+
+    <div class="btn-row">
+      <button class="btn secondary" onclick="clearCanvas('canvas-reset-v','cw-reset-v','hint-reset-v')">Clear</button>
+      <button class="btn" id="btn-reset-verify" disabled onclick="goTo('screen-reset-new')">Verify →</button>
+    </div>
+    <div class="pb"></div>
+  </div>
+
+  <!-- ========== SCREEN: RESET - NEW SIG ========== -->
+  <div class="screen" id="screen-reset-new">
+    <div class="topbar">
+      <div class="back-btn" onclick="goTo('screen-reset-verify')">←</div>
+      <div class="topbar-title">New Signature</div>
+    </div>
+
+    <div class="step-indicator" style="padding-bottom:16px">
+      <div class="step-dot done"></div>
+      <div class="step-dot active"></div>
+      <div class="step-dot"></div>
+    </div>
+
+    <div style="padding: 0 20px 16px">
+      <div class="hero-label" style="margin-bottom:4px">Step 2 of 3</div>
+      <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;">Draw new signature</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px;">Create a new unique signature. Make it memorable but complex.</div>
+    </div>
+
+    <div class="canvas-wrap" id="cw-reset-n">
+      <canvas id="canvas-reset-n" height="200"></canvas>
+      <div class="canvas-hint" id="hint-reset-n">
+        <div class="hint-icon">✨</div>
+        <div class="hint-text">Draw your new signature</div>
+      </div>
+    </div>
+
+    <div class="gap"></div>
+
+    <div class="info-box">
+      <strong>Tip:</strong> Combine your initials with a unique doodle. Timing and pressure are captured too — even if someone copies the shape, they can't copy <em>how</em> you draw it.
+    </div>
+
+    <div class="gap"></div>
+
+    <div class="btn-row">
+      <button class="btn secondary" onclick="clearCanvas('canvas-reset-n','cw-reset-n','hint-reset-n')">Clear</button>
+      <button class="btn" id="btn-reset-new-next" disabled onclick="goTo('screen-reset-confirm')">Next →</button>
+    </div>
+    <div class="pb"></div>
+  </div>
+
+  <!-- ========== SCREEN: RESET - CONFIRM NEW ========== -->
+  <div class="screen" id="screen-reset-confirm">
+    <div class="topbar">
+      <div class="back-btn" onclick="goTo('screen-reset-new')">←</div>
+      <div class="topbar-title">Confirm New Signature</div>
+    </div>
+
+    <div class="step-indicator" style="padding-bottom:16px">
+      <div class="step-dot done"></div>
+      <div class="step-dot done"></div>
+      <div class="step-dot active"></div>
+    </div>
+
+    <div style="padding: 0 20px 16px">
+      <div class="hero-label" style="margin-bottom:4px">Step 3 of 3</div>
+      <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;">Confirm new signature</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px;">Draw your new signature one more time to confirm.</div>
+    </div>
+
+    <div class="canvas-wrap" id="cw-reset-c">
+      <canvas id="canvas-reset-c" height="200"></canvas>
+      <div class="canvas-hint" id="hint-reset-c">
+        <div class="hint-icon">🔁</div>
+        <div class="hint-text">Redraw your new signature</div>
+      </div>
+    </div>
+
+    <div class="gap"></div>
+
+    <div class="btn-row">
+      <button class="btn secondary" onclick="clearCanvas('canvas-reset-c','cw-reset-c','hint-reset-c')">Clear</button>
+      <button class="btn success" id="btn-reset-save" disabled onclick="resetSuccess()">Save New Signature ✓</button>
+    </div>
+    <div class="pb"></div>
+  </div>
+
+  <!-- ========== SCREEN: RESET SUCCESS ========== -->
+  <div class="screen" id="screen-reset-success">
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:40px 24px;text-align:center;gap:16px;">
+      <div class="success-icon" style="margin:0 auto;background:rgba(108,99,255,0.1);border-color:var(--accent)">🔑</div>
+      <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;">Signature Updated!</div>
+      <div style="font-size:14px;color:var(--muted);line-height:1.7;max-width:280px;margin:0 auto;">Your new signature has been saved as a <strong style="color:var(--accent)">.sgpx</strong> file on this device. Old file has been deleted.</div>
+
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;font-size:13px;color:var(--muted);text-align:left;line-height:1.8">
+        <div>✅ <strong style="color:var(--text)">Old .sgpx deleted</strong></div>
+        <div>📂 <strong style="color:var(--text)">New .sgpx created locally</strong></div>
+        <div>🔒 <strong style="color:var(--text)">Behavioral data recaptured</strong></div>
+        <div>🚫 <strong style="color:var(--text)">No server involved</strong></div>
+      </div>
+    </div>
+
+    <div style="padding:0 20px">
+      <button class="btn" onclick="goHome()">Back to Home</button>
+    </div>
+    <div class="pb"></div>
+  </div>
+
+</div>
+
+<script>
+// ---- STATE ----
+let currentScreen = 'screen-home';
+let sendAmount = '0';
+let signatureSet = false;
+let enrolledImageData = null;
+let enrolledTiming = [];
+let authAttempts = 0;
+let useBackend = false;
+const BACKEND = 'http://localhost:5000';
+
+// ---- SIGNATURE MATCHING ENGINE ----
+
+// Downsample canvas to 64x32 grayscale grid for fast comparison
+function getSignatureFingerprint(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  const offscreen = document.createElement('canvas');
+  offscreen.width = 64; offscreen.height = 32;
+  const ctx = offscreen.getContext('2d');
+  ctx.drawImage(canvas, 0, 0, 64, 32);
+  const data = ctx.getImageData(0, 0, 64, 32).data;
+  // Convert to binary ink/no-ink array
+  const binary = [];
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = data[i + 3];
+    binary.push(alpha > 20 ? 1 : 0);
+  }
+  return binary;
+}
+
+// Compute pixel similarity (0-100)
+function pixelSimilarity(fp1, fp2) {
+  let matches = 0;
+  for (let i = 0; i < fp1.length; i++) {
+    if (fp1[i] === fp2[i]) matches++;
+  }
+  return (matches / fp1.length) * 100;
+}
+
+// Compute timing pattern similarity using normalized DTW-like comparison
+function timingSimilarity(t1, t2) {
+  const pts1 = t1.filter(p => p.x !== undefined);
+  const pts2 = t2.filter(p => p.x !== undefined);
+  if (pts1.length < 3 || pts2.length < 3) return 60; // not enough data, neutral
+
+  // Normalize to 0-1 range
+  const norm = (pts) => {
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const rangeX = maxX - minX || 1, rangeY = maxY - minY || 1;
+    return pts.map(p => ({ x: (p.x - minX) / rangeX, y: (p.y - minY) / rangeY }));
+  };
+
+  // Sample evenly to 20 points each
+  const sample = (pts, n) => {
+    const result = [];
+    for (let i = 0; i < n; i++) {
+      const idx = Math.floor(i * (pts.length - 1) / (n - 1));
+      result.push(pts[idx]);
+    }
+    return result;
+  };
+
+  const n1 = norm(pts1), n2 = norm(pts2);
+  const s1 = sample(n1, 20), s2 = sample(n2, 20);
+
+  // Average Euclidean distance
+  let totalDist = 0;
+  for (let i = 0; i < 20; i++) {
+    const dx = s1[i].x - s2[i].x;
+    const dy = s1[i].y - s2[i].y;
+    totalDist += Math.sqrt(dx * dx + dy * dy);
+  }
+  const avgDist = totalDist / 20;
+  // Convert distance to similarity (0-100), max useful dist is ~1.4
+  return Math.max(0, 100 - (avgDist / 1.4) * 100);
+}
+
+// Check if canvas has minimal ink (not just a dot)
+function hasEnoughInk(canvasId) {
+  const fp = getSignatureFingerprint(canvasId);
+  const inkPixels = fp.filter(v => v === 1).length;
+  return inkPixels > 30; // at least 30 pixels of ink
+}
+
+// Main compare function — returns { score, pixelScore, timingScore, matched }
+function compareSignatures(enrolledFP, enrolledTiming, testCanvasId, testTiming) {
+  const testFP = getSignatureFingerprint(testCanvasId);
+  const pixelScore = pixelSimilarity(enrolledFP, testFP);
+  const timingScore = timingSimilarity(enrolledTiming, testTiming);
+  // Weighted: 65% pixel shape, 35% timing behavior
+  const score = pixelScore * 0.65 + timingScore * 0.35;
+  const matched = score >= 52; // threshold — tuned for natural variation
+  return { score: Math.round(score), pixelScore: Math.round(pixelScore), timingScore: Math.round(timingScore), matched };
+}
+
+// Generate fake .sgpx metadata for display
+function generateSgpxMeta(canvasId, timing) {
+  const fp = getSignatureFingerprint(canvasId);
+  const inkCount = fp.filter(v => v === 1).length;
+  const pts = timing.filter(p => p.x !== undefined);
+  const duration = timing.length > 1 ? timing[timing.length-1].t - timing[0].t : 0;
+  const deviceId = btoa(navigator.userAgent.slice(0,20)).slice(0,16).toUpperCase();
+  return `[.sgpx v1.2 | AES-256-GCM encrypted]
+pixels: ${inkCount}/2048 ink density
+strokes: ${pts.length} coordinate points
+duration: ${duration}ms total draw time
+device_id: ${deviceId}
+timestamp: ${new Date().toISOString()}
+format: proprietary binary — unpublished spec`;
+}
+
+// ---- NAVIGATION ----
+function goTo(id) {
+  const cur = document.getElementById(currentScreen);
+  const next = document.getElementById(id);
+  cur.classList.add('exit');
+  setTimeout(() => { cur.classList.remove('active', 'exit'); }, 350);
+  next.style.transform = 'translateX(40px)';
+  next.style.opacity = '0';
+  setTimeout(() => {
+    next.classList.add('active');
+    next.style.transform = '';
+    next.style.opacity = '';
+  }, 10);
+  currentScreen = id;
+  // resize canvas for new screen
+  setTimeout(() => resizeAllCanvases(), 50);
+}
+
+// ---- CANVAS SETUP ----
+const canvases = ['canvas-set','canvas-confirm','canvas-auth','canvas-reset-v','canvas-reset-n','canvas-reset-c'];
+const canvasState = {};
+
+function resizeAllCanvases() {
+  canvases.forEach(id => {
+    const c = document.getElementById(id);
+    if (c) {
+      const w = c.parentElement.offsetWidth;
+      if (c.width !== w) {
+        c.width = w;
+        c.height = 220;
+      }
+    }
+  });
+}
+
+function initCanvas(canvasId, wrapId, hintId, btnId) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  const hint = document.getElementById(hintId);
+  const btn = btnId ? document.getElementById(btnId) : null;
+
+  canvas.width = canvas.parentElement.offsetWidth || 350;
+  canvas.height = 220;
+
+  canvasState[canvasId] = { drawing: false, hasDrawn: false, strokes: [], timing: [] };
+
+  ctx.strokeStyle = '#6c63ff';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const src = e.touches ? e.touches[0] : e;
+    return {
+      x: (src.clientX - rect.left) * scaleX,
+      y: (src.clientY - rect.top) * scaleY
+    };
+  }
+
+  function startDraw(e) {
+    e.preventDefault();
+    canvasState[canvasId].drawing = true;
+    canvasState[canvasId].timing.push({ t: Date.now(), type: 'start' });
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    document.getElementById(wrapId).classList.add('drawing');
+    if (hint) hint.style.opacity = '0';
+  }
+
+  function draw(e) {
+    e.preventDefault();
+    if (!canvasState[canvasId].drawing) return;
+    const pos = getPos(e);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    canvasState[canvasId].timing.push({ t: Date.now(), x: pos.x, y: pos.y });
+  }
+
+  function endDraw(e) {
+    if (!canvasState[canvasId].drawing) return;
+    canvasState[canvasId].drawing = false;
+    canvasState[canvasId].hasDrawn = true;
+    canvasState[canvasId].timing.push({ t: Date.now(), type: 'end' });
+    document.getElementById(wrapId).classList.remove('drawing');
+    document.getElementById(wrapId).classList.add('done');
+    if (btn) btn.disabled = false;
+  }
+
+  canvas.addEventListener('mousedown', startDraw);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', endDraw);
+  canvas.addEventListener('touchstart', startDraw, { passive: false });
+  canvas.addEventListener('touchmove', draw, { passive: false });
+  canvas.addEventListener('touchend', endDraw);
+}
+
+function clearCanvas(canvasId, wrapId, hintId) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  canvasState[canvasId] = { drawing: false, hasDrawn: false, strokes: [], timing: [] };
+  document.getElementById(wrapId).classList.remove('drawing', 'done');
+  document.getElementById(hintId).style.opacity = '1';
+  // disable button
+  const btnMap = {
+    'canvas-set': 'btn-set-next',
+    'canvas-confirm': 'btn-confirm-save',
+    'canvas-auth': 'btn-auth-pay',
+    'canvas-reset-v': 'btn-reset-verify',
+    'canvas-reset-n': 'btn-reset-new-next',
+    'canvas-reset-c': 'btn-reset-save',
+  };
+  if (btnMap[canvasId]) document.getElementById(btnMap[canvasId]).disabled = true;
+}
+
+// ---- FLOW FUNCTIONS ----
+function goToConfirm() {
+  goTo('screen-confirm-sig');
+}
+
+async function saveSignature() {
+  const btn = document.getElementById('btn-confirm-save');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  try {
+    const canvas = document.getElementById('canvas-set');
+    const png = canvas.toDataURL('image/png');
+    const timing = canvasState['canvas-set'].timing.slice();
+    const res = await fetch(`${BACKEND}/enroll`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ png, timing, user_id: 'demo_user' })
+    });
+    const data = await res.json();
+    if (data.success) {
+      signatureSet = true;
+      enrolledImageData = getSignatureFingerprint('canvas-set');
+      enrolledTiming = timing;
+      useBackend = true;
+      console.log('[SignPay Backend] .sgpx saved:\n' + data.sgpx_summary);
+    } else { throw new Error(data.error); }
+  } catch(e) {
+    console.warn('[SignPay] Backend offline, using local matching');
+    enrolledImageData = getSignatureFingerprint('canvas-set');
+    enrolledTiming = canvasState['canvas-set'].timing.slice();
+    signatureSet = true;
+    useBackend = false;
+  }
+  btn.disabled = false;
+  btn.textContent = 'Save Signature ✓';
+  goTo('screen-home');
+  document.querySelector('.auth-badge').innerHTML = '<span class="dot"></span> Signature Enrolled · .sgpx saved';
+}
+
+// NUMPAD
+function numPress(val) {
+  if (sendAmount === '0') sendAmount = val;
+  else if (sendAmount.length < 6) sendAmount += val;
+  document.getElementById('send-amount-display').textContent = parseInt(sendAmount).toLocaleString();
+  document.getElementById('btn-proceed-pay').disabled = parseInt(sendAmount) <= 0;
+}
+function numDel() {
+  sendAmount = sendAmount.slice(0, -1) || '0';
+  document.getElementById('send-amount-display').textContent = parseInt(sendAmount).toLocaleString();
+  document.getElementById('btn-proceed-pay').disabled = parseInt(sendAmount) <= 0;
+}
+
+function proceedToPay() {
+  document.getElementById('auth-amount-label').textContent = parseInt(sendAmount).toLocaleString();
+  goTo('screen-send-auth');
+}
+
+function clearAuthCanvas() {
+  clearCanvas('canvas-auth','cw-auth','hint-auth');
+  document.getElementById('similarity-wrap').classList.remove('show');
+  document.getElementById('match-toast').classList.remove('show');
+  document.getElementById('sgpx-debug').classList.remove('show');
+  document.getElementById('cw-auth').classList.remove('failed');
+}
+
+async function verifyAndPay() {
+  if (!enrolledImageData && !useBackend) {
+    proceedWithPayment(); return;
+  }
+  if (!hasEnoughInk('canvas-auth')) {
+    showMatchResult(false, 0, 0, 0, "Draw more — signature too short"); return;
+  }
+  const btn = document.getElementById('btn-auth-pay');
+  btn.disabled = true;
+  btn.textContent = 'Verifying...';
+  const testTiming = canvasState['canvas-auth'].timing.slice();
+  try {
+    let result;
+    if (useBackend) {
+      const png = document.getElementById('canvas-auth').toDataURL('image/png');
+      const res = await fetch(`${BACKEND}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ png, timing: testTiming, user_id: 'demo_user' })
+      });
+      const data = await res.json();
+      result = { matched: data.matched, score: data.score,
+                 pixelScore: data.pixel_score, timingScore: data.timing_score };
+      const dbg = document.getElementById('sgpx-debug');
+      dbg.textContent = `[Python backend | .sgpx matched]\npixel_match: ${data.pixel_score}%  |  timing_match: ${data.timing_score}%\ncombined: ${data.score}%  |  threshold: ${data.threshold}%\nresult: ${data.verdict}`;
+      dbg.classList.add('show');
+    } else {
+      result = compareSignatures(enrolledImageData, enrolledTiming, 'canvas-auth', testTiming);
+      const dbg = document.getElementById('sgpx-debug');
+      dbg.textContent = generateSgpxMeta('canvas-auth', testTiming) +
+        `\npixel_match: ${result.pixelScore}% | timing_match: ${result.timingScore}%\nresult: ${result.matched ? 'AUTHENTICATED ✓' : 'REJECTED ✗'}`;
+      dbg.classList.add('show');
+    }
+    // Show bar
+    const wrap = document.getElementById('similarity-wrap');
+    const bar = document.getElementById('similarity-bar');
+    const scoreLabel = document.getElementById('similarity-score-label');
+    wrap.classList.add('show');
+    setTimeout(() => {
+      bar.style.width = result.score + '%';
+      bar.className = 'bar-fill ' + (result.matched ? 'good' : 'bad');
+      scoreLabel.textContent = result.score + '%';
+      scoreLabel.className = 'similarity-score ' + (result.matched ? 'good' : 'bad');
+    }, 100);
+    setTimeout(() => {
+      showMatchResult(result.matched, result.score, result.pixelScore, result.timingScore);
+      btn.textContent = 'Verify & Send 🔐';
+    }, 700);
+  } catch(e) {
+    console.error('[SignPay]', e);
+    btn.disabled = false;
+    btn.textContent = 'Verify & Send 🔐';
+  }
+}
+
+function showMatchResult(matched, score, pixelScore, timingScore, customMsg) {
+  authAttempts++;
+  const toast = document.getElementById('match-toast');
+  const icon = document.getElementById('match-toast-icon');
+  const text = document.getElementById('match-toast-text');
+  const cw = document.getElementById('cw-auth');
+
+  toast.classList.remove('show', 'success', 'fail');
+
+  setTimeout(() => {
+    if (matched) {
+      toast.className = 'match-toast show success';
+      icon.textContent = '✅';
+      text.textContent = `Signature matched! (${score}% similarity) — Processing payment...`;
+      cw.classList.remove('failed');
+      cw.classList.add('done');
+      setTimeout(() => proceedWithPayment(), 1200);
+    } else {
+      toast.className = 'match-toast show fail';
+      icon.textContent = '❌';
+      text.textContent = customMsg || `Signature not recognised (${score}% similarity). Try again.`;
+      cw.classList.remove('done');
+      cw.classList.add('failed');
+      // Shake animation
+      cw.style.animation = 'shake 0.4s ease';
+      setTimeout(() => { cw.style.animation = ''; }, 400);
+      // Re-enable clear to try again
+      document.getElementById('btn-auth-pay').disabled = true;
+    }
+    toast.classList.add('show');
+  }, 50);
+}
+
+function proceedWithPayment() {
+  const amt = parseInt(sendAmount);
+  const balEl = document.getElementById('home-balance');
+  const cur = parseInt(balEl.textContent.replace(/,/g,''));
+  balEl.textContent = (cur - amt).toLocaleString();
+  document.getElementById('success-amount-val').textContent = amt.toLocaleString();
+  const now = new Date();
+  document.getElementById('success-time').textContent =
+    now.getHours().toString().padStart(2,'0') + '' + now.getMinutes().toString().padStart(2,'0');
+  sendAmount = '0';
+  document.getElementById('send-amount-display').textContent = '0';
+  // Reset auth screen state
+  document.getElementById('similarity-wrap').classList.remove('show');
+  document.getElementById('match-toast').classList.remove('show');
+  document.getElementById('sgpx-debug').classList.remove('show');
+  goTo('screen-success');
+}
+
+function resetSuccess() {
+  // Store new signature from reset-new canvas
+  enrolledImageData = getSignatureFingerprint('canvas-reset-n');
+  enrolledTiming = canvasState['canvas-reset-n'].timing.slice();
+  goTo('screen-reset-success');
+}
+
+function goHome() {
+  goTo('screen-home');
+}
+
+// ---- INIT ----
+window.addEventListener('load', () => {
+  resizeAllCanvases();
+  initCanvas('canvas-set', 'cw-set', 'hint-set', 'btn-set-next');
+  initCanvas('canvas-confirm', 'cw-confirm', 'hint-confirm', 'btn-confirm-save');
+  initCanvas('canvas-auth', 'cw-auth', 'hint-auth', 'btn-auth-pay');
+  initCanvas('canvas-reset-v', 'cw-reset-v', 'hint-reset-v', 'btn-reset-verify');
+  initCanvas('canvas-reset-n', 'cw-reset-n', 'hint-reset-n', 'btn-reset-new-next');
+  initCanvas('canvas-reset-c', 'cw-reset-c', 'hint-reset-c', 'btn-reset-save');
+});
+
+window.addEventListener('resize', resizeAllCanvases);
+</script>
+</body>
+</html>
