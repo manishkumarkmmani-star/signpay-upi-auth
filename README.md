@@ -30,7 +30,7 @@ Even if someone watches your screen, they can't replicate HOW you draw.
 
 ## Demo Video
 
-Watch the live demo:
+Watch the demo:
 
 https://github.com/manishkumarkmmani-star/signpay-upi-auth/raw/main/demo.mp4
 
