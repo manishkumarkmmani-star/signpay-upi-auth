@@ -123,9 +123,16 @@ signpay-upi-auth/
 ECE Final Year Student | Bangalore  
 Original concept & full implementation  
 
-## License
+## License & Usage
 
-MIT License — See LICENSE file
+This project is protected by copyright. 
+- ✅ You can VIEW the source code
+- ❌ You cannot USE it without permission
+- ❌ You cannot MODIFY or DISTRIBUTE it
+
+This is intentional IP protection. SignPay is a proprietary concept.
+
+For licensing inquiries or collaboration, contact: [your email]
 
 ## Disclaimer
 
