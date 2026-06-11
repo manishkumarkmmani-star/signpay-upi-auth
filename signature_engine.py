@@ -49,9 +49,139 @@ def png_to_binary_grid(png_base64: str) -> list[int]:
     # Resize to our small grid
     img_small = img.resize((GRID_W, GRID_H), Image.LANCZOS)
     pixels = list(img_small.getdata())
+
+    def crop_to_ink(grid: list[int], width: int = 64, height: int = 32) -> list[int]:
+    """
+    Crop the drawing to just the ink area.
+    Removes empty borders so position doesn't matter.
+    """
+    # Convert flat list to 2D grid
+    rows = [grid[i*width:(i+1)*width] for i in range(height)]
     
+    # Find bounding box of ink
+    ink_rows = [i for i, row in enumerate(rows) if any(p == 1 for p in row)]
+    ink_cols = [j for j in range(width) if any(rows[i][j] == 1 for i in range(height))]
+    
+    # If no ink found return original
+    if not ink_rows or not ink_cols:
+        return grid
+    
+    top, bottom = ink_rows[0], ink_rows[-1]
+    left, right = ink_cols[0], ink_cols[-1]
+    
+    # Crop to bounding box
+    cropped = []
+    for i in range(top, bottom + 1):
+        for j in range(left, right + 1):
+            cropped.append(rows[i][j])
+    
+    crop_h = bottom - top + 1
+    crop_w = right - left + 1
+    
+    # Resize cropped area back to 64x32 using nearest neighbor
+    result = []
+    for i in range(height):
+        for j in range(width):
+            src_i = int(i * crop_h / height)
+            src_j = int(j * crop_w / width)
+            src_idx = src_i * crop_w + src_j
+            result.append(cropped[src_idx] if src_idx < len(cropped) else 0)
+    
+    return result
+
+    def scale_normalize(grid: list[int], width: int = 64, height: int = 32) -> list[int]:
+    """
+    After cropping, ensure signature always fills
+    the same area regardless of how big or small it was drawn.
+    Automatically handled by crop_to_ink() resize step above.
+    This function adds padding so tiny signatures don't get stretched weirdly.
+    """
+    # Add small padding around the cropped signature
+    PADDING = 3  # pixels of padding on each side
+    
+    rows = [grid[i*width:(i+1)*width] for i in range(height)]
+    
+    # Find ink bounds again
+    ink_rows = [i for i, row in enumerate(rows) if any(p == 1 for p in row)]
+    ink_cols = [j for j in range(width) if any(rows[i][j] == 1 for i in range(height))]
+    
+    if not ink_rows or not ink_cols:
+        return grid
+    
+    top = max(0, ink_rows[0] - PADDING)
+    bottom = min(height-1, ink_rows[-1] + PADDING)
+    left = max(0, ink_cols[0] - PADDING)
+    right = min(width-1, ink_cols[-1] + PADDING)
+    
+    # Return padded crop resized to full grid
+    cropped = []
+    for i in range(top, bottom + 1):
+        for j in range(left, right + 1):
+            cropped.append(rows[i][j])
+    
+    crop_h = bottom - top + 1
+    crop_w = right - left + 1
+    
+    result = []
+    for i in range(height):
+        for j in range(width):
+            src_i = int(i * crop_h / height)
+            src_j = int(j * crop_w / width)
+            src_idx = src_i * crop_w + src_j
+            result.append(cropped[src_idx] if src_idx < len(cropped) else 0)
+    
+    return result
+
+    def center_align(grid: list[int], width: int = 64, height: int = 32) -> list[int]:
+    """
+    Shift the entire drawing so its center of mass
+    is always at the center of the grid.
+    Fixes left/right/top/bottom position differences.
+    """
+    rows = [grid[i*width:(i+1)*width] for i in range(height)]
+    
+    # Find center of mass of ink pixels
+    ink_x, ink_y, count = 0, 0, 0
+    for i in range(height):
+        for j in range(width):
+            if rows[i][j] == 1:
+                ink_x += j
+                ink_y += i
+                count += 1
+    
+    if count == 0:
+        return grid
+    
+    # Current center of mass
+    cx = ink_x // count
+    cy = ink_y // count
+    
+    # Target center
+    target_cx = width // 2
+    target_cy = height // 2
+    
+    # Shift needed
+    shift_x = target_cx - cx
+    shift_y = target_cy - cy
+    
+    # Apply shift
+    result = [0] * (width * height)
+    for i in range(height):
+        for j in range(width):
+            if rows[i][j] == 1:
+                new_i = i + shift_y
+                new_j = j + shift_x
+                if 0 <= new_i < height and 0 <= new_j < width:
+                    result[new_i * width + new_j] = 1
+    
+    return result
     # Binary: if alpha channel > 20, there's ink
     binary = [1 if p[3] > 20 else 0 for p in pixels]
+    
+    # Apply all 3 upgrades
+    binary = crop_to_ink(binary)       # Upgrade 1: remove empty borders
+    binary = scale_normalize(binary)   # Upgrade 2: consistent scale
+    binary = center_align(binary)      # Upgrade 3: center the drawing
     
     return binary
 
