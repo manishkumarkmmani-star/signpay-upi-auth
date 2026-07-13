@@ -23,7 +23,7 @@ import base64
 # ── Config ──────────────────────────────────────────────
 GRID_W = 64          # downsample width
 GRID_H = 32          # downsample height
-THRESHOLD = 52       # minimum similarity % to accept (0-100)
+THRESHOLD = 75       # minimum similarity % to accept (0-100)
 PIXEL_WEIGHT = 0.65  # how much shape matters
 TIMING_WEIGHT = 0.35 # how much speed/pattern matters
 STORAGE_DIR = "signatures"  # where .sgpx files are stored
