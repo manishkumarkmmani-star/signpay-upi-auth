@@ -118,7 +118,7 @@ def verify():
 
         # Log to console (so you can see what's happening)
         print(f"\n[VERIFY] User: {user_id}")
-        print(f"  Pixel score:  {result['pixel_score']}%")
+        print(f"Shape score:  {result['shape_score']}%")
         print(f"  Timing score: {result['timing_score']}%")
         print(f"  Combined:     {result['score']}%")
         print(f"  Result:       {result['verdict']}")
