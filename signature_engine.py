@@ -19,6 +19,7 @@ import numpy as np
 from PIL import Image
 import io
 import base64
+import math
 
 # ── Config ──────────────────────────────────────────────
 GRID_W = 64          # downsample width
@@ -248,19 +249,107 @@ def timing_similarity(t1: list[dict], t2: list[dict]) -> float:
     return round(similarity, 2)
 
 
-# ── Step 3: Pixel Similarity ─────────────────────────────
+# ── Step 3: shape_similarity ─────────────────────────────
 
-def pixel_similarity(grid1: list[int], grid2: list[int]) -> float:
+def iou_similarity(grid1: list[int], grid2: list[int]) -> float:
     """
-    Compare two binary grids.
-    Returns similarity 0-100.
+    Shape overlap using Intersection over Union.
     """
-    if len(grid1) != len(grid2):
-        return 0.0
-    
-    matches = sum(1 for a, b in zip(grid1, grid2) if a == b)
-    return round((matches / len(grid1)) * 100, 2)
 
+    intersection = 0
+    union = 0
+
+    for a, b in zip(grid1, grid2):
+
+        if a == 1 or b == 1:
+            union += 1
+
+            if a == 1 and b == 1:
+                intersection += 1
+
+    if union == 0:
+        return 100.0
+
+    return (intersection / union) * 100
+
+
+def centroid_similarity(grid1: list[int], grid2: list[int]) -> float:
+
+    def centroid(grid):
+
+        xs = []
+        ys = []
+
+        for idx, p in enumerate(grid):
+
+            if p == 1:
+
+                x = idx % GRID_W
+                y = idx // GRID_W
+
+                xs.append(x)
+                ys.append(y)
+
+        if len(xs) == 0:
+            return None
+
+        return (
+            sum(xs) / len(xs),
+            sum(ys) / len(ys)
+        )
+
+    c1 = centroid(grid1)
+    c2 = centroid(grid2)
+
+    if c1 is None or c2 is None:
+        return 0
+
+    dist = math.sqrt(
+        (c1[0]-c2[0])**2 +
+        (c1[1]-c2[1])**2
+    )
+
+    max_dist = math.sqrt(GRID_W**2 + GRID_H**2)
+
+    return max(
+        0,
+        (1 - dist/max_dist) * 100
+    )
+
+def density_similarity(grid1: list[int], grid2: list[int]) -> float:
+
+    ink1 = sum(grid1)
+    ink2 = sum(grid2)
+
+    if ink1 == 0 and ink2 == 0:
+        return 100
+
+    if max(ink1, ink2) == 0:
+        return 0
+
+    return (
+        min(ink1, ink2)
+        /
+        max(ink1, ink2)
+    ) * 100
+
+def shape_similarity(grid1: list[int], grid2: list[int]) -> float:
+
+    iou = iou_similarity(grid1, grid2)
+
+    centroid = centroid_similarity(grid1, grid2)
+
+    density = density_similarity(grid1, grid2)
+
+    score = (
+        iou * 0.60
+        +
+        centroid * 0.25
+        +
+        density * 0.15
+    )
+
+    return round(score,2)
 
 # ── Step 4: Combined Match Score ─────────────────────────
 
@@ -270,11 +359,14 @@ def compare_signatures(enrolled: dict, test_grid: list[int],
     Full comparison between enrolled signature and test input.
     Returns detailed result dict.
     """
-    pixel_score = pixel_similarity(enrolled['grid'], test_grid)
+    shape_score = shape_similarity(
+    enrolled['grid'],
+    test_grid
+)
     timing_score = timing_similarity(enrolled['timing'], test_timing)
     
     # Weighted combination
-    combined = (pixel_score * PIXEL_WEIGHT) + (timing_score * TIMING_WEIGHT)
+    combined = (shape_score * 0.70) + (timing_score * 0.30)
     combined = round(combined, 2)
     
     matched = combined >= THRESHOLD
@@ -282,7 +374,7 @@ def compare_signatures(enrolled: dict, test_grid: list[int],
     return {
         "matched": matched,
         "score": combined,
-        "pixel_score": pixel_score,
+        "shape_score": shape_score,
         "timing_score": timing_score,
         "threshold": THRESHOLD,
         "verdict": "AUTHENTICATED ✓" if matched else "REJECTED ✗"
