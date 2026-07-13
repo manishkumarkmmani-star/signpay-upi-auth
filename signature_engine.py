@@ -180,7 +180,6 @@ def png_to_binary_grid(png_base64: str) -> list[int]:
     
     # Apply all 3 upgrades
     binary = crop_to_ink(binary)       # Upgrade 1: remove empty borders
-    binary = scale_normalize(binary)   # Upgrade 2: consistent scale
     binary = center_align(binary)      # Upgrade 3: center the drawing
     
     return binary
