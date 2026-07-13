@@ -1230,6 +1230,8 @@ function numDel() {
 }
 
 function proceedToPay() {
+ // Clear auth canvas before showing it
+  clearAuthCanvas();
   document.getElementById('auth-amount-label').textContent = parseInt(sendAmount).toLocaleString();
   goTo('screen-send-auth');
 }
