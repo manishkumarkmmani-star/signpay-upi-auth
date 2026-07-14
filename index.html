@@ -1272,7 +1272,10 @@ async function verifyAndPay() {
     timingScore: data.timing_score
 };
       const dbg = document.getElementById('sgpx-debug');
-      dbg.textContent = `[Python backend | .sgpx matched]\npixel_match: ${data.pixel_score}%  |  timing_match: ${data.timing_score}%\ncombined: ${data.score}%  |  threshold: ${data.threshold}%\nresult: ${data.verdict}`;
+      dbg.textContent = `[Python backend | .sgpx matched]
+shape_match: ${data.shape_score}%  |  timing_match: ${data.timing_score}%
+combined: ${data.score}%  |  threshold: ${data.threshold}%
+result: ${data.verdict}`;
       dbg.classList.add('show');
     } else {
       result = compareSignatures(enrolledImageData, enrolledTiming, 'canvas-auth', testTiming);
