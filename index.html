@@ -1280,8 +1280,7 @@ result: ${data.verdict}`;
     } else {
       result = compareSignatures(enrolledImageData, enrolledTiming, 'canvas-auth', testTiming);
       const dbg = document.getElementById('sgpx-debug');
-      dbg.textContent = generateSgpxMeta('canvas-auth', testTiming) +
-        `\npixel_match: ${result.shapeScore}% | timing_match: ${result.timingScore}%\nresult: ${result.matched ? 'AUTHENTICATED ✓' : 'REJECTED ✗'}`;
+      dbg.textContent =generateSgpxMeta(...)+`\nshape_match: ${result.shapeScore}% | timing_match: ${result.timingScore}%\nresult: ${result.matched ? 'AUTHENTICATED ✓' : 'REJECTED ✗'}`
       dbg.classList.add('show');
     }
     // Show bar
