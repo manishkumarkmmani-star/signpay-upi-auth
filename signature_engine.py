@@ -348,6 +348,9 @@ def shape_similarity(grid1: list[int], grid2: list[int]) -> float:
         +
         density * 0.10
     )
+    print("IoU:", iou)
+    print("Centroid:", centroid_score)
+    print("Density:", density_score)
 
     return round(score,2)
 
