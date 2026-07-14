@@ -1032,12 +1032,12 @@ function hasEnoughInk(canvasId) {
 // Main compare function — returns { score, pixelScore, timingScore, matched }
 function compareSignatures(enrolledFP, enrolledTiming, testCanvasId, testTiming) {
   const testFP = getSignatureFingerprint(testCanvasId);
-  const pixelScore = pixelSimilarity(enrolledFP, testFP);
+  const shapeScore = pixelSimilarity(enrolledFP, testFP);
   const timingScore = timingSimilarity(enrolledTiming, testTiming);
   // Weighted: 65% pixel shape, 35% timing behavior
-  const score = pixelScore * 0.65 + timingScore * 0.35;
-  const matched = score >= 52; // threshold — tuned for natural variation
-  return { score: Math.round(score), pixelScore: Math.round(pixelScore), timingScore: Math.round(timingScore), matched };
+  const score = shapeScore * 0.7 + timingScore * 0.3;
+  const matched = score >= 75; // threshold — tuned for natural variation
+  return { score: Math.round(score), shapeScore: Math.round(shapeScore), timingScore: Math.round(timingScore), matched };
 }
 
 // Generate fake .sgpx metadata for display
@@ -1278,7 +1278,7 @@ async function verifyAndPay() {
       result = compareSignatures(enrolledImageData, enrolledTiming, 'canvas-auth', testTiming);
       const dbg = document.getElementById('sgpx-debug');
       dbg.textContent = generateSgpxMeta('canvas-auth', testTiming) +
-        `\npixel_match: ${result.pixelScore}% | timing_match: ${result.timingScore}%\nresult: ${result.matched ? 'AUTHENTICATED ✓' : 'REJECTED ✗'}`;
+        `\npixel_match: ${result.shapeScore}% | timing_match: ${result.timingScore}%\nresult: ${result.matched ? 'AUTHENTICATED ✓' : 'REJECTED ✗'}`;
       dbg.classList.add('show');
     }
     // Show bar
@@ -1293,7 +1293,7 @@ async function verifyAndPay() {
       scoreLabel.className = 'similarity-score ' + (result.matched ? 'good' : 'bad');
     }, 100);
     setTimeout(() => {
-      showMatchResult(result.matched, result.score, result.pixelScore, result.timingScore);
+      showMatchResult(result.matched, result.score, result.shapeScore, result.timingScore);
       btn.textContent = 'Verify & Send 🔐';
     }, 700);
   } catch(e) {
@@ -1303,7 +1303,7 @@ async function verifyAndPay() {
   }
 }
 
-function showMatchResult(matched, score, pixelScore, timingScore, customMsg) {
+function showMatchResult(matched, score, shapeScore, timingScore, customMsg) {
   authAttempts++;
   const toast = document.getElementById('match-toast');
   const icon = document.getElementById('match-toast-icon');
