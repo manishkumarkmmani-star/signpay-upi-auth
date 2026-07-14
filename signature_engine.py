@@ -25,8 +25,8 @@ import math
 GRID_W = 64          # downsample width
 GRID_H = 32          # downsample height
 THRESHOLD = 75       # minimum similarity % to accept (0-100)
-PIXEL_WEIGHT = 0.65  # how much shape matters
-TIMING_WEIGHT = 0.35 # how much speed/pattern matters
+SHAPE_WEIGHT = 0.70  #how much shape matters
+TIMING_WEIGHT = 0.30 # how much speed/pattern matters
 STORAGE_DIR = "signatures"  # where .sgpx files are stored
 
 os.makedirs(STORAGE_DIR, exist_ok=True)
@@ -348,9 +348,9 @@ def shape_similarity(grid1: list[int], grid2: list[int]) -> float:
         +
         density * 0.10
     )
-    print("IoU:", iou)
-    print("Centroid:", centroid_score)
-    print("Density:", density_score)
+    print("IoU:", round(iou,2))
+    print("Centroid:", round(centroid,2))
+    print("Density:", round(density,2))
 
     return round(score,2)
 
