@@ -1265,8 +1265,12 @@ async function verifyAndPay() {
         body: JSON.stringify({ png, timing: testTiming, user_id: 'demo_user' })
       });
       const data = await res.json();
-      result = { matched: data.matched, score: data.score,
-                 pixelScore: data.pixel_score, timingScore: data.timing_score };
+      result = {
+    matched: data.matched,
+    score: data.score,
+    shapeScore: data.shape_score,
+    timingScore: data.timing_score
+};
       const dbg = document.getElementById('sgpx-debug');
       dbg.textContent = `[Python backend | .sgpx matched]\npixel_match: ${data.pixel_score}%  |  timing_match: ${data.timing_score}%\ncombined: ${data.score}%  |  threshold: ${data.threshold}%\nresult: ${data.verdict}`;
       dbg.classList.add('show');
