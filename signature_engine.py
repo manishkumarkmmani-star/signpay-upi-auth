@@ -373,6 +373,13 @@ def compare_signatures(enrolled: dict, test_grid: list[int],
     combined = round(combined, 2)
     
     matched = combined >= THRESHOLD
+    print("================================")
+    print("Shape Score :", shape_score)
+    print("Timing Score:", timing_score)
+    print("Combined    :", combined)
+    print("Threshold   :", THRESHOLD)
+    print("Matched     :", matched)
+    print("================================")
     
     return {
         "matched": matched,
