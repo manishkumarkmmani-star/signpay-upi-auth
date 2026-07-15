@@ -2,7 +2,7 @@
 
 A working prototype that replaces the 4-digit UPI PIN with a handwritten signature using on-device behavioral biometrics.
 
-**Problem:** Every UPI scam exploits the static, visible, typeable PIN (only 10,000 combinations).
+**Problem:** Every UPI scam exploits the static, visible, typeable PIN (only 10,000 combinations for 4 digit upi no.).
 
 **Solution:** Draw your unique signature instead. The system captures:
 - Shape (pixel pattern)
@@ -121,7 +121,7 @@ signpay-upi-auth/
 
 **Manish Kumar K M**  
 ECE Final Year Student | Bangalore  
-Original concept & full implementation  
+Original concept & implementation  (Build phase)
 
 ## License & Usage
 
