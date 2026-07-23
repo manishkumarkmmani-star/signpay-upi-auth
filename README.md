@@ -143,3 +143,7 @@ This is a working prototype for educational purposes. Not suitable for productio
 **Built for:** Paytm Ideathon 2026  
 **Created:** May 2026  
 **Status:** Active Development
+
+> ⚠️ This project is under active development for IDBI Innovate 2026.
+> All Rights Reserved — © 2026 Manish Kumar K M
+> Viewing permitted. Commercial use prohibited without written permission.
