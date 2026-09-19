@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>SignPay — Secure UPI</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
@@ -622,7 +621,7 @@
 
     <div class="btn-row">
       <button class="btn secondary" onclick="clearCanvas('canvas-set','cw-set','hint-set')">Clear</button>
-      <button class="btn" id="btn-set-next" disabled onclick="goToConfirm()">Next →</button>
+      <button class="btn" id="btn-set-next" disabled onclick="verifyOldSignatureForReset()">Next →</button>
     </div>
     <div class="pb"></div>
   </div>
@@ -951,8 +950,9 @@ let signatureSet = false;
 let enrolledImageData = null;
 let enrolledTiming = [];
 let authAttempts = 0;
-let useBackend = false;
-const BACKEND = 'http://localhost:5000';
+const BACKEND = 'http://127.0.0.1:5000';
+let useBackend = true;
+let backendReady = true;
 
 // ---- SIGNATURE MATCHING ENGINE ----
 
@@ -973,14 +973,7 @@ function getSignatureFingerprint(canvasId) {
   return binary;
 }
 
-// Compute pixel similarity (0-100)
-function pixelSimilarity(fp1, fp2) {
-  let matches = 0;
-  for (let i = 0; i < fp1.length; i++) {
-    if (fp1[i] === fp2[i]) matches++;
-  }
-  return (matches / fp1.length) * 100;
-}
+
 
 // Compute timing pattern similarity using normalized DTW-like comparison
 function timingSimilarity(t1, t2) {
@@ -1029,16 +1022,7 @@ function hasEnoughInk(canvasId) {
   return inkPixels > 30; // at least 30 pixels of ink
 }
 
-// Main compare function — returns { score, pixelScore, timingScore, matched }
-function compareSignatures(enrolledFP, enrolledTiming, testCanvasId, testTiming) {
-  const testFP = getSignatureFingerprint(testCanvasId);
-  const pixelScore = pixelSimilarity(enrolledFP, testFP);
-  const timingScore = timingSimilarity(enrolledTiming, testTiming);
-  // Weighted: 65% pixel shape, 35% timing behavior
-  const score = pixelScore * 0.65 + timingScore * 0.35;
-  const matched = score >= 52; // threshold — tuned for natural variation
-  return { score: Math.round(score), pixelScore: Math.round(pixelScore), timingScore: Math.round(timingScore), matched };
-}
+
 
 // Generate fake .sgpx metadata for display
 function generateSgpxMeta(canvasId, timing) {
@@ -1100,8 +1084,13 @@ function initCanvas(canvasId, wrapId, hintId, btnId) {
   canvas.width = canvas.parentElement.offsetWidth || 350;
   canvas.height = 220;
 
-  canvasState[canvasId] = { drawing: false, hasDrawn: false, strokes: [], timing: [] };
-
+canvasState[canvasId] = {
+  drawing: false,
+  hasDrawn: false,
+  strokes: [],
+  timing: [],
+  strokeId: 0
+};
   ctx.strokeStyle = '#6c63ff';
   ctx.lineWidth = 3;
   ctx.lineCap = 'round';
@@ -1120,34 +1109,77 @@ function initCanvas(canvasId, wrapId, hintId, btnId) {
 
   function startDraw(e) {
     e.preventDefault();
-    canvasState[canvasId].drawing = true;
-    canvasState[canvasId].timing.push({ t: Date.now(), type: 'start' });
+
+    const state = canvasState[canvasId];
+
+    state.drawing = true;
+    state.strokeId += 1;
+
+    state.timing.push({
+      t: Date.now(),
+      type: 'start',
+      stroke_id: state.strokeId
+    });
+
     const pos = getPos(e);
+
     ctx.beginPath();
     ctx.moveTo(pos.x, pos.y);
-    document.getElementById(wrapId).classList.add('drawing');
-    if (hint) hint.style.opacity = '0';
+
+    document.getElementById(wrapId)
+      .classList.add('drawing');
+
+    if (hint) {
+      hint.style.opacity = '0';
+    }
   }
 
   function draw(e) {
     e.preventDefault();
-    if (!canvasState[canvasId].drawing) return;
+
+    const state = canvasState[canvasId];
+
+    if (!state.drawing) return;
+
     const pos = getPos(e);
+
     ctx.lineTo(pos.x, pos.y);
     ctx.stroke();
+
     ctx.beginPath();
     ctx.moveTo(pos.x, pos.y);
-    canvasState[canvasId].timing.push({ t: Date.now(), x: pos.x, y: pos.y });
+
+    state.timing.push({
+      t: Date.now(),
+      x: pos.x,
+      y: pos.y,
+      stroke_id: state.strokeId
+    });
   }
 
   function endDraw(e) {
-    if (!canvasState[canvasId].drawing) return;
-    canvasState[canvasId].drawing = false;
-    canvasState[canvasId].hasDrawn = true;
-    canvasState[canvasId].timing.push({ t: Date.now(), type: 'end' });
-    document.getElementById(wrapId).classList.remove('drawing');
-    document.getElementById(wrapId).classList.add('done');
-    if (btn) btn.disabled = false;
+    const state = canvasState[canvasId];
+
+    if (!state.drawing) return;
+  
+    state.drawing = false;
+    state.hasDrawn = true;
+
+    state.timing.push({
+      t: Date.now(),
+      type: 'end',
+      stroke_id: state.strokeId
+    });
+
+    document.getElementById(wrapId)
+      .classList.remove('drawing');
+
+    document.getElementById(wrapId)
+      .classList.add('done');
+
+    if (btn) {
+      btn.disabled = false;
+    }
   }
 
   canvas.addEventListener('mousedown', startDraw);
@@ -1162,7 +1194,13 @@ function clearCanvas(canvasId, wrapId, hintId) {
   const canvas = document.getElementById(canvasId);
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  canvasState[canvasId] = { drawing: false, hasDrawn: false, strokes: [], timing: [] };
+  canvasState[canvasId] = {
+  drawing: false,
+  hasDrawn: false,
+  strokes: [],
+  timing: [],
+  strokeId: 0
+  };
   document.getElementById(wrapId).classList.remove('drawing', 'done');
   document.getElementById(hintId).style.opacity = '1';
   // disable button
@@ -1183,37 +1221,87 @@ function goToConfirm() {
 }
 
 async function saveSignature() {
-  const btn = document.getElementById('btn-confirm-save');
+
+  const btn = document.getElementById(
+    'btn-confirm-save'
+  );
+
   btn.disabled = true;
   btn.textContent = 'Saving...';
+
   try {
-    const canvas = document.getElementById('canvas-set');
-    const png = canvas.toDataURL('image/png');
-    const timing = canvasState['canvas-set'].timing.slice();
-    const res = await fetch(`${BACKEND}/enroll`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ png, timing, user_id: 'demo_user' })
-    });
+
+    const canvas =
+      document.getElementById('canvas-confirm');
+
+    const png =
+      canvas.toDataURL('image/png');
+
+    const timing =
+      canvasState['canvas-set']
+        .timing
+        .slice();
+
+    const res = await fetch(
+      `${BACKEND}/enroll`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':
+            'application/json'
+        },
+        body: JSON.stringify({
+          png,
+          timing,
+          user_id: 'demo_user'
+        })
+      }
+    );
+
     const data = await res.json();
-    if (data.success) {
-      signatureSet = true;
-      enrolledImageData = getSignatureFingerprint('canvas-set');
-      enrolledTiming = timing;
-      useBackend = true;
-      console.log('[SignPay Backend] .sgpx saved:\n' + data.sgpx_summary);
-    } else { throw new Error(data.error); }
-  } catch(e) {
-    console.warn('[SignPay] Backend offline, using local matching');
-    enrolledImageData = getSignatureFingerprint('canvas-set');
-    enrolledTiming = canvasState['canvas-set'].timing.slice();
-    signatureSet = true;
-    useBackend = false;
+
+    if (!res.ok || !data.success) {
+      throw new Error(
+        data.error ||
+        'Enrollment failed'
+      );
+    }
+
+    backendReady = true;
+    enrolledTiming = timing.slice();
+
+    console.log(
+      '[SignPay] Backend enrollment successful',
+      data
+    );
+
+    btn.textContent =
+      'Saved ✓';
+
+    document
+      .querySelector('.auth-badge')
+      .innerHTML =
+        '<span class="dot"></span> ' +
+        'Signature Enrolled · Backend ready';
+
+    goTo('screen-home');
+
+  } catch (e) {
+
+    console.error(
+      '[SignPay Enrollment]',
+      e
+    );
+
+    alert(
+      'SignPay backend is not available. ' +
+      'Start the Python backend and try again.'
+    );
+
+    btn.disabled = false;
+    btn.textContent =
+      'Save Signature ✓';
   }
-  btn.disabled = false;
-  btn.textContent = 'Save Signature ✓';
-  goTo('screen-home');
-  document.querySelector('.auth-badge').innerHTML = '<span class="dot"></span> Signature Enrolled · .sgpx saved';
 }
 
 // NUMPAD
@@ -1230,6 +1318,8 @@ function numDel() {
 }
 
 function proceedToPay() {
+ // Clear auth canvas before showing it
+  clearAuthCanvas();
   document.getElementById('auth-amount-label').textContent = parseInt(sendAmount).toLocaleString();
   goTo('screen-send-auth');
 }
@@ -1242,62 +1332,239 @@ function clearAuthCanvas() {
   document.getElementById('cw-auth').classList.remove('failed');
 }
 
-async function verifyAndPay() {
-  if (!enrolledImageData && !useBackend) {
-    proceedWithPayment(); return;
-  }
-  if (!hasEnoughInk('canvas-auth')) {
-    showMatchResult(false, 0, 0, 0, "Draw more — signature too short"); return;
-  }
-  const btn = document.getElementById('btn-auth-pay');
-  btn.disabled = true;
-  btn.textContent = 'Verifying...';
-  const testTiming = canvasState['canvas-auth'].timing.slice();
+async function checkBackendStatus() {
   try {
-    let result;
-    if (useBackend) {
-      const png = document.getElementById('canvas-auth').toDataURL('image/png');
-      const res = await fetch(`${BACKEND}/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ png, timing: testTiming, user_id: 'demo_user' })
-      });
-      const data = await res.json();
-      result = { matched: data.matched, score: data.score,
-                 pixelScore: data.pixel_score, timingScore: data.timing_score };
-      const dbg = document.getElementById('sgpx-debug');
-      dbg.textContent = `[Python backend | .sgpx matched]\npixel_match: ${data.pixel_score}%  |  timing_match: ${data.timing_score}%\ncombined: ${data.score}%  |  threshold: ${data.threshold}%\nresult: ${data.verdict}`;
-      dbg.classList.add('show');
-    } else {
-      result = compareSignatures(enrolledImageData, enrolledTiming, 'canvas-auth', testTiming);
-      const dbg = document.getElementById('sgpx-debug');
-      dbg.textContent = generateSgpxMeta('canvas-auth', testTiming) +
-        `\npixel_match: ${result.pixelScore}% | timing_match: ${result.timingScore}%\nresult: ${result.matched ? 'AUTHENTICATED ✓' : 'REJECTED ✗'}`;
-      dbg.classList.add('show');
+    const res = await fetch(
+      `${BACKEND}/status?user_id=demo_user`
+    );
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error('Backend status failed');
     }
-    // Show bar
-    const wrap = document.getElementById('similarity-wrap');
-    const bar = document.getElementById('similarity-bar');
-    const scoreLabel = document.getElementById('similarity-score-label');
-    wrap.classList.add('show');
-    setTimeout(() => {
-      bar.style.width = result.score + '%';
-      bar.className = 'bar-fill ' + (result.matched ? 'good' : 'bad');
-      scoreLabel.textContent = result.score + '%';
-      scoreLabel.className = 'similarity-score ' + (result.matched ? 'good' : 'bad');
-    }, 100);
-    setTimeout(() => {
-      showMatchResult(result.matched, result.score, result.pixelScore, result.timingScore);
-      btn.textContent = 'Verify & Send 🔐';
-    }, 700);
-  } catch(e) {
-    console.error('[SignPay]', e);
-    btn.disabled = false;
-    btn.textContent = 'Verify & Send 🔐';
+
+    backendReady = data.enrolled === true;
+    signatureSet = data.enrolled === true;
+
+    console.log(
+      '[SignPay] Backend status:',
+      data
+    );
+
+    const badge =
+      document.querySelector('.auth-badge');
+
+    if (badge) {
+      badge.innerHTML =
+        backendReady
+          ? '<span class="dot"></span> Signature Enrolled · Backend ready'
+          : '<span class="dot"></span> No signature enrolled';
+    }
+
+  } catch (e) {
+
+    backendReady = false;
+    signatureSet = false;
+
+    console.error(
+      '[SignPay] Backend unavailable:',
+      e
+    );
+
+    const badge =
+      document.querySelector('.auth-badge');
+
+    if (badge) {
+      badge.innerHTML =
+        '<span class="dot"></span> Backend unavailable';
+    }
   }
 }
 
-function showMatchResult(matched, score, pixelScore, timingScore, customMsg) {
+async function verifyAndPay() {
+
+  if (!backendReady) {
+
+    showMatchResult(
+      false,
+      0,
+      0,
+      0,
+      'SignPay backend is not ready'
+    );
+
+    return;
+  }
+
+  if (!hasEnoughInk('canvas-auth')) {
+
+    showMatchResult(
+      false,
+      0,
+      0,
+      0,
+      'Draw more — signature too short'
+    );
+
+    return;
+  }
+
+  const btn =
+    document.getElementById(
+      'btn-auth-pay'
+    );
+
+  btn.disabled = true;
+  btn.textContent = 'Verifying...';
+
+  try {
+
+    const canvas =
+      document.getElementById(
+        'canvas-auth'
+      );
+
+    const png =
+      canvas.toDataURL('image/png');
+
+    const timing =
+      canvasState['canvas-auth']
+        .timing
+        .slice();
+
+    const res = await fetch(
+      `${BACKEND}/verify`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':
+            'application/json'
+        },
+        body: JSON.stringify({
+          png,
+          timing,
+          user_id: 'demo_user'
+        })
+      }
+    );
+
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+
+      throw new Error(
+        data.error ||
+        'Verification failed'
+      );
+    }
+
+    const result = {
+      matched: data.matched,
+      score: data.score,
+      shapeScore: data.shape_score,
+      behaviorScore: data.behavior_score
+    };
+
+    const dbg =
+      document.getElementById(
+        'sgpx-debug'
+      );
+
+    dbg.textContent =
+      `[Python backend | authoritative]\n` +
+      `shape: ${data.shape_score}%\n` +
+      `  IoU: ${data.shape.iou}%\n` +
+      `  OpenCV: ${data.shape.opencv}%\n` +
+      `  Hu: ${data.shape.hu}%\n` +
+      `behavior: ${data.behavior_score}%\n` +
+      `  trajectory: ${data.behavior.trajectory}%\n` +
+      `  velocity: ${data.behavior.velocity}%\n` +
+      `  direction: ${data.behavior.direction}%\n` +
+      `  duration: ${data.behavior.duration}%\n` +
+      `  stroke: ${data.behavior.stroke}%\n` +
+      `combined: ${data.score}%\n` +
+      `threshold: ${data.threshold}%\n` +
+      `result: ${data.verdict}`;
+
+    dbg.classList.add('show');
+
+    const wrap =
+      document.getElementById(
+        'similarity-wrap'
+      );
+
+    const bar =
+      document.getElementById(
+        'similarity-bar'
+      );
+
+    const scoreLabel =
+      document.getElementById(
+        'similarity-score-label'
+      );
+
+    wrap.classList.add('show');
+
+    setTimeout(() => {
+
+      bar.style.width =
+        result.score + '%';
+
+      bar.className =
+        'bar-fill ' +
+        (result.matched
+          ? 'good'
+          : 'bad');
+
+      scoreLabel.textContent =
+        result.score + '%';
+
+      scoreLabel.className =
+        'similarity-score ' +
+        (result.matched
+          ? 'good'
+          : 'bad');
+
+    }, 100);
+
+    setTimeout(() => {
+
+      showMatchResult(
+        result.matched,
+        result.score,
+        result.shapeScore,
+        result.behaviorScore
+      );
+
+      btn.textContent =
+        'Verify & Send 🔐';
+
+    }, 700);
+
+  } catch (e) {
+
+    console.error(
+      '[SignPay Verification]',
+      e
+    );
+
+    btn.disabled = false;
+
+    btn.textContent =
+      'Verify & Send 🔐';
+
+    showMatchResult(
+      false,
+      0,
+      0,
+      0,
+      'Verification failed — check backend'
+    );
+  }
+}
+
+function showMatchResult(matched, score, shapeScore, timingScore, customMsg) {
   authAttempts++;
   const toast = document.getElementById('match-toast');
   const icon = document.getElementById('match-toast-icon');
@@ -1348,11 +1615,197 @@ function proceedWithPayment() {
   goTo('screen-success');
 }
 
-function resetSuccess() {
-  // Store new signature from reset-new canvas
-  enrolledImageData = getSignatureFingerprint('canvas-reset-n');
-  enrolledTiming = canvasState['canvas-reset-n'].timing.slice();
-  goTo('screen-reset-success');
+async function verifyOldSignatureForReset() {
+
+  if (!backendReady) {
+    alert(
+      'SignPay backend is not ready. ' +
+      'Please start the backend and enroll a signature.'
+    );
+    return;
+  }
+
+  const btn =
+    document.getElementById(
+      'btn-reset-verify'
+    );
+
+  btn.disabled = true;
+  btn.textContent = 'Verifying...';
+
+  try {
+
+    const canvas =
+      document.getElementById(
+        'canvas-reset-v'
+      );
+
+    const png =
+      canvas.toDataURL('image/png');
+
+    const timing =
+      canvasState['canvas-reset-v']
+        .timing
+        .slice();
+
+    const res = await fetch(
+      `${BACKEND}/verify`,
+      {
+        method: 'POST',
+
+        headers: {
+          'Content-Type':
+            'application/json'
+        },
+
+        body: JSON.stringify({
+          png,
+          timing,
+          user_id: 'demo_user'
+        })
+      }
+    );
+
+    const data =
+      await res.json();
+
+    if (
+      !res.ok ||
+      !data.success ||
+      !data.matched
+    ) {
+
+      throw new Error(
+        data.error ||
+        'Current signature did not match'
+      );
+    }
+
+    console.log(
+      '[SignPay] Old signature verified',
+      data
+    );
+
+    btn.textContent = 'Verified ✓';
+
+    goTo(
+      'screen-reset-new'
+    );
+
+  } catch (e) {
+
+    console.error(
+      '[SignPay Reset Verification]',
+      e
+    );
+
+    alert(
+      'Current signature was not recognised. ' +
+      'Signature change cancelled.'
+    );
+
+    btn.disabled = false;
+    btn.textContent = 'Verify →';
+  }
+}
+
+async function resetSuccess() {
+
+  const btn =
+    document.getElementById(
+      'btn-reset-save'
+    );
+
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  try {
+
+    const canvas =
+      document.getElementById(
+        'canvas-reset-n'
+      );
+
+    const png =
+      canvas.toDataURL('image/png');
+
+    const timing =
+      canvasState['canvas-reset-n']
+        .timing
+        .slice();
+
+    const res = await fetch(
+      `${BACKEND}/reset`,
+      {
+        method: 'POST',
+
+        headers: {
+          'Content-Type':
+            'application/json'
+        },
+
+        body: JSON.stringify({
+          png,
+          timing,
+          user_id: 'demo_user'
+        })
+      }
+    );
+
+    const data =
+      await res.json();
+
+    if (
+      !res.ok ||
+      !data.success
+    ) {
+
+      throw new Error(
+        data.error ||
+        'Signature reset failed'
+      );
+    }
+
+    backendReady = true;
+    signatureSet = true;
+
+    enrolledTiming =
+      timing.slice();
+
+    console.log(
+      '[SignPay] New signature saved',
+      data
+    );
+
+    btn.textContent =
+      'Saved ✓';
+
+    document
+      .querySelector('.auth-badge')
+      .innerHTML =
+        '<span class="dot"></span> ' +
+        'Signature Enrolled · Backend ready';
+
+    goTo(
+      'screen-reset-success'
+    );
+
+  } catch (e) {
+
+    console.error(
+      '[SignPay Reset]',
+      e
+    );
+
+    alert(
+      'Could not update signature. ' +
+      'Check that the backend is running.'
+    );
+
+    btn.disabled = false;
+    btn.textContent =
+      'Save New Signature ✓';
+  }
 }
 
 function goHome() {
@@ -1360,17 +1813,54 @@ function goHome() {
 }
 
 // ---- INIT ----
-window.addEventListener('load', () => {
-  resizeAllCanvases();
-  initCanvas('canvas-set', 'cw-set', 'hint-set', 'btn-set-next');
-  initCanvas('canvas-confirm', 'cw-confirm', 'hint-confirm', 'btn-confirm-save');
-  initCanvas('canvas-auth', 'cw-auth', 'hint-auth', 'btn-auth-pay');
-  initCanvas('canvas-reset-v', 'cw-reset-v', 'hint-reset-v', 'btn-reset-verify');
-  initCanvas('canvas-reset-n', 'cw-reset-n', 'hint-reset-n', 'btn-reset-new-next');
-  initCanvas('canvas-reset-c', 'cw-reset-c', 'hint-reset-c', 'btn-reset-save');
-});
+window.addEventListener('load', async () => {
 
-window.addEventListener('resize', resizeAllCanvases);
+  resizeAllCanvases();
+
+  initCanvas(
+    'canvas-set',
+    'cw-set',
+    'hint-set',
+    'btn-set-next'
+  );
+
+  initCanvas(
+    'canvas-confirm',
+    'cw-confirm',
+    'hint-confirm',
+    'btn-confirm-save'
+  );
+
+  initCanvas(
+    'canvas-auth',
+    'cw-auth',
+    'hint-auth',
+    'btn-auth-pay'
+  );
+
+  initCanvas(
+    'canvas-reset-v',
+    'cw-reset-v',
+    'hint-reset-v',
+    'btn-reset-verify'
+  );
+
+  initCanvas(
+    'canvas-reset-n',
+    'cw-reset-n',
+    'hint-reset-n',
+    'btn-reset-new-next'
+  );
+
+  initCanvas(
+    'canvas-reset-c',
+    'cw-reset-c',
+    'hint-reset-c',
+    'btn-reset-save'
+  );
+
+  await checkBackendStatus();
+});
 </script>
 </body>
 </html>

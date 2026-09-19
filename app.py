@@ -1,20 +1,6 @@
-# SignPay — Behavioral Signature Authentication for UPI
-# Author: Manish Kumar K M
-# License: MIT
-# Description: Flask backend for on-device signature matching
-"""
-SignPay Flask Backend
-=====================
-API Endpoints:
-  POST /enroll   → save user's signature (.sgpx)
-  POST /verify   → compare drawn signature vs stored
-  POST /reset    → delete old .sgpx, save new one
-  GET  /status   → check if user has enrolled signature
-  GET  /sgpx     → get .sgpx file summary (for demo display)
-"""
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+
 from signature_engine import (
     png_to_binary_grid,
     save_sgpx,
@@ -25,103 +11,201 @@ from signature_engine import (
     get_sgpx_summary
 )
 
-app = Flask(__name__)
-CORS(app)  # Allow frontend (HTML file) to call this API
 
-# Default user for demo
+app = Flask(__name__)
+
+CORS(app)
+
 DEFAULT_USER = "demo_user"
 
 
-# ─────────────────────────────────────────
-# POST /enroll
-# Body: { png: "data:image/png;base64,...", timing: [...] }
-# Saves signature as .sgpx file
-# ─────────────────────────────────────────
-@app.route('/enroll', methods=['POST'])
+# ============================================================
+# ENROLL
+# ============================================================
+
+@app.route("/enroll", methods=["POST"])
 def enroll():
+
     try:
-        data = request.get_json()
-        png_b64 = data.get('png')
-        timing = data.get('timing', [])
-        user_id = data.get('user_id', DEFAULT_USER)
+
+        data = request.get_json() or {}
+
+        png_b64 = data.get("png")
+        timing = data.get("timing", [])
+        user_id = data.get(
+            "user_id",
+            DEFAULT_USER
+        )
 
         if not png_b64:
-            return jsonify({"success": False, "error": "No image data"}), 400
 
-        # Convert canvas PNG → binary grid
-        grid = png_to_binary_grid(png_b64)
-        ink_count = sum(grid)
-
-        # Check enough ink
-        if not has_enough_ink(grid):
             return jsonify({
                 "success": False,
-                "error": "Signature too short — draw more"
+                "error": "No image data"
             }), 400
 
-        # Save to .sgpx file
-        filepath = save_sgpx(user_id, grid, timing, ink_count)
+        grid = png_to_binary_grid(
+            png_b64
+        )
 
-        # Return summary
-        summary = get_sgpx_summary(user_id)
+        if not has_enough_ink(grid):
+
+            return jsonify({
+                "success": False,
+                "error":
+                    "Signature too short — draw more"
+            }), 400
+
+        filepath = save_sgpx(
+            user_id,
+            grid,
+            timing,
+            sum(grid)
+        )
 
         return jsonify({
             "success": True,
-            "message": f"Signature enrolled for {user_id}",
-            "ink_pixels": ink_count,
-            "timing_points": len(timing),
+            "message":
+                f"Signature enrolled for {user_id}",
             "file": filepath,
-            "sgpx_summary": summary
+            "sgpx_summary":
+                get_sgpx_summary(user_id)
         })
 
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 
-# ─────────────────────────────────────────
-# POST /verify
-# Body: { png: "...", timing: [...] }
-# Compares against stored .sgpx
-# ─────────────────────────────────────────
-@app.route('/verify', methods=['POST'])
+# ============================================================
+# VERIFY
+# ============================================================
+
+@app.route("/verify", methods=["POST"])
 def verify():
+
     try:
-        data = request.get_json()
-        png_b64 = data.get('png')
-        timing = data.get('timing', [])
-        user_id = data.get('user_id', DEFAULT_USER)
+
+        data = request.get_json() or {}
+
+        png_b64 = data.get("png")
+        timing = data.get("timing", [])
+
+        user_id = data.get(
+            "user_id",
+            DEFAULT_USER
+        )
 
         if not png_b64:
-            return jsonify({"success": False, "error": "No image data"}), 400
 
-        # Load enrolled signature
-        enrolled = load_sgpx(user_id)
-        if not enrolled:
             return jsonify({
                 "success": False,
-                "error": "No signature enrolled. Please set up first."
-            }), 404
-
-        # Convert test drawing → grid
-        test_grid = png_to_binary_grid(png_b64)
-
-        if not has_enough_ink(test_grid):
-            return jsonify({
-                "success": False,
-                "matched": False,
-                "error": "Signature too short — draw more",
-                "score": 0
+                "error": "No image data"
             }), 400
 
-        # Compare
-        result = compare_signatures(enrolled, test_grid, timing)
+        enrolled = load_sgpx(
+            user_id
+        )
 
-        # Log to console (so you can see what's happening)
-        print(f"\n[VERIFY] User: {user_id}")
-        print(f"  Pixel score:  {result['pixel_score']}%")
-        print(f"  Timing score: {result['timing_score']}%")
-        print(f"  Combined:     {result['score']}%")
-        print(f"  Result:       {result['verdict']}")
+        if not enrolled:
+
+            return jsonify({
+                "success": False,
+                "error":
+                    "No signature enrolled"
+            }), 404
+
+        test_grid = png_to_binary_grid(
+            png_b64
+        )
+
+        if not has_enough_ink(test_grid):
+
+            return jsonify({
+                "success": True,
+                "matched": False,
+                "score": 0,
+                "error":
+                    "Signature too short — draw more"
+            })
+
+        result = compare_signatures(
+            enrolled,
+            test_grid,
+            timing
+        )
+
+        print("\n========== SIGNPAY VERIFY ==========")
+
+        print(
+            "Shape:",
+            result["shape_score"]
+        )
+
+        print(
+            "  IoU:",
+            result["shape"]["iou"]
+        )
+
+        print(
+            "  OpenCV:",
+            result["shape"]["opencv"]
+        )
+
+        print(
+            "  Hu:",
+            result["shape"]["hu"]
+        )
+
+        print(
+            "Behavior:",
+            result["behavior_score"]
+        )
+
+        print(
+            "  Trajectory:",
+            result["behavior"]["trajectory"]
+        )
+
+        print(
+            "  Velocity:",
+            result["behavior"]["velocity"]
+        )
+
+        print(
+            "  Direction:",
+            result["behavior"]["direction"]
+        )
+
+        print(
+            "  Duration:",
+            result["behavior"]["duration"]
+        )
+
+        print(
+            "  Stroke:",
+            result["behavior"]["stroke"]
+        )
+
+        print(
+            "FINAL:",
+            result["score"]
+        )
+
+        print(
+            "THRESHOLD:",
+            result["threshold"]
+        )
+
+        print(
+            "RESULT:",
+            result["verdict"]
+        )
+
+        print("====================================")
 
         return jsonify({
             "success": True,
@@ -129,93 +213,147 @@ def verify():
         })
 
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+
+        print(
+            "[SignPay ERROR]",
+            repr(e)
+        )
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 
-# ─────────────────────────────────────────
-# POST /reset
-# Body: { png: "...", timing: [...] }
-# Deletes old .sgpx and saves new one
-# ─────────────────────────────────────────
-@app.route('/reset', methods=['POST'])
+# ============================================================
+# RESET
+# ============================================================
+
+@app.route("/reset", methods=["POST"])
 def reset():
+
     try:
-        data = request.get_json()
-        png_b64 = data.get('png')
-        timing = data.get('timing', [])
-        user_id = data.get('user_id', DEFAULT_USER)
+
+        data = request.get_json() or {}
+
+        png_b64 = data.get("png")
+        timing = data.get("timing", [])
+
+        user_id = data.get(
+            "user_id",
+            DEFAULT_USER
+        )
 
         if not png_b64:
-            return jsonify({"success": False, "error": "No image data"}), 400
 
-        grid = png_to_binary_grid(png_b64)
-        ink_count = sum(grid)
-
-        if not has_enough_ink(grid):
             return jsonify({
                 "success": False,
-                "error": "New signature too short"
+                "error": "No image data"
             }), 400
 
-        # Delete old
-        deleted = delete_sgpx(user_id)
+        grid = png_to_binary_grid(
+            png_b64
+        )
 
-        # Save new
-        filepath = save_sgpx(user_id, grid, timing, ink_count)
-        summary = get_sgpx_summary(user_id)
+        if not has_enough_ink(grid):
+
+            return jsonify({
+                "success": False,
+                "error":
+                    "New signature too short"
+            }), 400
+
+        deleted = delete_sgpx(
+            user_id
+        )
+
+        filepath = save_sgpx(
+            user_id,
+            grid,
+            timing,
+            sum(grid)
+        )
 
         return jsonify({
             "success": True,
-            "message": "Signature reset successfully",
             "old_deleted": deleted,
             "new_file": filepath,
-            "sgpx_summary": summary
+            "sgpx_summary":
+                get_sgpx_summary(user_id)
         })
 
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 
-# ─────────────────────────────────────────
-# GET /status?user_id=demo_user
-# Check if user has enrolled
-# ─────────────────────────────────────────
-@app.route('/status', methods=['GET'])
+# ============================================================
+# STATUS
+# ============================================================
+
+@app.route("/status", methods=["GET"])
 def status():
-    user_id = request.args.get('user_id', DEFAULT_USER)
-    enrolled = load_sgpx(user_id)
+
+    user_id = request.args.get(
+        "user_id",
+        DEFAULT_USER
+    )
+
+    enrolled = load_sgpx(
+        user_id
+    )
+
     return jsonify({
-        "enrolled": enrolled is not None,
-        "user_id": user_id,
-        "summary": get_sgpx_summary(user_id) if enrolled else None
+        "enrolled":
+            enrolled is not None,
+        "user_id":
+            user_id,
+        "summary":
+            get_sgpx_summary(user_id)
+            if enrolled
+            else None
     })
 
 
-# ─────────────────────────────────────────
-# GET /sgpx?user_id=demo_user
-# Get .sgpx file summary for display
-# ─────────────────────────────────────────
-@app.route('/sgpx', methods=['GET'])
+# ============================================================
+# SGPX INFO
+# ============================================================
+
+@app.route("/sgpx", methods=["GET"])
 def sgpx_info():
-    user_id = request.args.get('user_id', DEFAULT_USER)
-    summary = get_sgpx_summary(user_id)
-    enrolled = load_sgpx(user_id)
+
+    user_id = request.args.get(
+        "user_id",
+        DEFAULT_USER
+    )
+
+    enrolled = load_sgpx(
+        user_id
+    )
+
     return jsonify({
-        "summary": summary,
-        "has_signature": enrolled is not None
+        "summary":
+            get_sgpx_summary(user_id),
+        "has_signature":
+            enrolled is not None
     })
 
 
-if __name__ == '__main__':
+# ============================================================
+# START SERVER
+# ============================================================
+
+if __name__ == "__main__":
     print("=" * 50)
-    print("  SignPay Backend Running")
-    print("  http://localhost:5000")
+    print(" SignPay Backend Running")
+    print(" http://127.0.0.1:5000")
     print("=" * 50)
-    print("Endpoints:")
-    print("  POST /enroll  — save signature")
-    print("  POST /verify  — match signature")
-    print("  POST /reset   — change signature")
-    print("  GET  /status  — check enrollment")
-    print("  GET  /sgpx    — view .sgpx info")
-    print("=" * 50)
-    app.run(debug=True, port=5000)
+
+    app.run(
+        host="127.0.0.1",
+        port=5000,
+        debug=False
+    )
